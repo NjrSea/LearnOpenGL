@@ -9,6 +9,7 @@
 #include <glm\gtc\type_ptr.hpp> // glm::value_ptr
 #include <glm\gtc\matrix_transform.hpp> // glm::translate, glm::rotate, glm::scale, glm::perspective
 #include "Util.h"
+#include <math.h>
 
 //#pragma comment(lib, "glew32.lib")  // 指定使用静态库，但是把dll放到产物文件夹里去掉了也能用
 
@@ -27,7 +28,7 @@ GLuint vbo[numVBOs];
 GLuint mvLoc, projLoc;
 int width, height;
 float aspect;
-glm::mat4 pMat, vMat, mMat, mvMat;
+glm::mat4 pMat, vMat, mMat, mvMat, tMat, rMat;
 
 // 36个顶点，12个三角形，组成了纺织在原点出的2*2*2立方体
 void setupVertices() {
@@ -96,8 +97,8 @@ void init(GLFWwindow *window) {
 	setupVertices();
 }
 
-void display(GLFWwindow *window, double currenTime) {
-	glClear(GL_DEPTH_BUFFER_BIT);
+void display(GLFWwindow *window, double currentTime) {
+	glClear(GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT);
 	glUseProgram(renderingProgram);
 
 	// 获取MV矩阵和投影矩阵的统一变量
@@ -111,7 +112,14 @@ void display(GLFWwindow *window, double currenTime) {
 
 	// 构建视图矩阵、模型矩阵和视图-模型矩阵
 	vMat = glm::translate(glm::mat4(1.0f), glm::vec3(-cameraX, -cameraY, -cameraZ));
-	mMat = glm::translate(glm::mat4(1.0f), glm::vec3(cubeLocX, cubeLocY, cubeLocZ));
+
+	tMat = glm::translate(glm::mat4(1.0f), glm::vec3(sin(0.35f*currentTime)*2.0f, cos(0.52f*currentTime)*2.0f, sin(0.7f*currentTime)*2.0f));
+	
+	rMat = glm::rotate(glm::mat4(1.0f), 1.75f*(float)currentTime, glm::vec3(0.0f, 1.0f, 0.0f));
+	rMat = glm::rotate(rMat, 1.75f*(float)currentTime, glm::vec3(1.0f, 0.0f, 0.0f));
+	rMat = glm::rotate(rMat, 1.75f*(float)currentTime, glm::vec3(0.0f, 0.0f, 1.0f));
+
+	mMat = tMat * rMat;
 
 	mvMat = vMat * mMat;
 
