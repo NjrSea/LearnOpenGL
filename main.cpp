@@ -20,15 +20,16 @@ using namespace std;
 
 float cameraX, cameraY, cameraZ;
 float cubeLocX, cubeLocY, cubeLocZ;
+float pyrLocX, pyrLocY, pyrLocZ;
 
 GLuint renderingProgram;
 GLuint vao[numVAOs];
 GLuint vbo[numVBOs];
 
-GLuint mLoc, vLoc, mvLoc, projLoc, tfLoc;
+GLuint mvLoc, projLoc, tfLoc;
 int width, height;
 float aspect;
-glm::mat4 pMat, vMat, mMat, mvMat, tMat, rMat;
+glm::mat4 pMat, vMat, mMat, mvMat;
 
 // 36个顶点，12个三角形，组成了纺织在原点出的2*2*2立方体
 void setupVertices() {
@@ -46,54 +47,35 @@ void setupVertices() {
 		-1.0f,  1.0f, -1.0f, 1.0f,  1.0f, -1.0f, 1.0f,  1.0f,  1.0f,
 		1.0f,  1.0f,  1.0f, -1.0f,  1.0f,  1.0f, -1.0f,  1.0f, -1.0f
 	};
+	float pyramidPositions[54] =
+	{ -1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 1.0f, 0.0f, 1.0f, 0.0f,    //front
+		1.0f, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 0.0f, 1.0f, 0.0f,    //right
+		1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 0.0f, 1.0f, 0.0f,  //back
+		-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1.0f, 0.0f, 1.0f, 0.0f,  //left
+		-1.0f, -1.0f, -1.0f, 1.0f, -1.0f, 1.0f, -1.0f, -1.0f, 1.0f, //LF
+		1.0f, -1.0f, 1.0f, -1.0f, -1.0f, -1.0f, 1.0f, -1.0f, -1.0f  //RR
+	};
 	glGenVertexArrays(1, vao);
 	glBindVertexArray(vao[0]);
 	glGenBuffers(numVBOs, vbo);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertexPositions), vertexPositions, GL_STATIC_DRAW);
-}
-
-string readShaderSource(const char *filePath) {
-	string content;
-	ifstream fileStream(filePath, ios::in);
-	string line;
-	while (!fileStream.eof()) {
-		getline(fileStream, line); // getline是 <string>里的函数
-		content.append(line + "\n");
-	}
-	fileStream.close(); // 注意用完stream要关掉
-	return content;
-}
-
-GLuint createShaderProgram() {
-	// 这样写是有问题的，readShaderSource("shader/vShader.glsl")返回的string在调用.c_str()赋值给vshaderSource指针后，就释放了vshaderSource指向的内存是非法的
-	//const char *vshaderSource = readShaderSource("shader/vShader.glsl").c_str(); 
-
-	string vshaderString = readShaderSource("shader/vShader.glsl");
-	string fshaderString = readShaderSource("shader/fShader.glsl");
-	const char *vshaderSource = vshaderString.c_str();
-	const char *fshaderSource = fshaderString.c_str();
-
-	GLuint vShader = glCreateShader(GL_VERTEX_SHADER);
-	GLuint fShader = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(vShader, 1, &vshaderSource, NULL);
-	glShaderSource(fShader, 1, &fshaderSource, NULL);
-	glCompileShader(vShader);
-	glCompileShader(fShader);
-
-	GLuint vfProgram = glCreateProgram();
-	glAttachShader(vfProgram, vShader);
-	glAttachShader(vfProgram, fShader);
-	glLinkProgram(vfProgram);
-
-	return vfProgram;
+	glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(pyramidPositions), pyramidPositions, GL_STATIC_DRAW);
 }
 
 void init(GLFWwindow *window) {
 	renderingProgram = Utils::createShaderProgram("shader/vShader.glsl", "shader/fShader.glsl");
-	cameraX = 0.0f; cameraY = 0.0f; cameraZ = 428.0f;
+
+	// 构建透视矩
+	glfwGetFramebufferSize(window, &width, &height);
+	aspect = (float)width / (float)height;
+	pMat = glm::perspective(1.0472f, aspect, 0.1f, 1000.0f); // 1.0472 radians = 60 degress
+
+	cameraX = 0.0f; cameraY = 0.0f; cameraZ = 8.0f;
 	cubeLocX = 0.0f; cubeLocY = -2.0f; cubeLocZ = 0.0f;
+	pyrLocX = 2.0f; pyrLocY = 2.0f; pyrLocZ = 0.0f;
 	setupVertices();
 }
 
@@ -102,36 +84,20 @@ void display(GLFWwindow *window, double currentTime) {
 	glUseProgram(renderingProgram);
 
 	// 获取MV矩阵和投影矩阵的统一变量
-	mLoc = glGetUniformLocation(renderingProgram, "m_matrix");
-	vLoc = glGetUniformLocation(renderingProgram, "v_matrix");
+	mvLoc = glGetUniformLocation(renderingProgram, "mv_matrix");
 	projLoc = glGetUniformLocation(renderingProgram, "proj_matrix");
 
-	// 构建透视矩阵
-	glfwGetFramebufferSize(window, &width, &height);
-	aspect = (float)width / (float)height;
-	pMat = glm::perspective(1.0472f, aspect, 0.1f, 1000.0f); // 1.0472 radians = 60 degress
-
+	
 	// 构建视图矩阵、模型矩阵和视图-模型矩阵
 	vMat = glm::translate(glm::mat4(1.0f), glm::vec3(-cameraX, -cameraY, -cameraZ));
-	mMat = glm::mat4(1.0f);
-
-	//tMat = glm::translate(glm::mat4(1.0f), glm::vec3(sin(0.35f*currentTime)*2.0f, cos(0.52f*currentTime)*2.0f, sin(0.7f*currentTime)*2.0f));
 	
-	//rMat = glm::rotate(glm::mat4(1.0f), 1.75f*(float)currentTime, glm::vec3(0.0f, 1.0f, 0.0f));
-	//rMat = glm::rotate(rMat, 1.75f*(float)currentTime, glm::vec3(1.0f, 0.0f, 0.0f));
-	//rMat = glm::rotate(rMat, 1.75f*(float)currentTime, glm::vec3(0.0f, 0.0f, 1.0f));
+	// draw the cube using buffer #0
+	mMat = glm::translate(glm::mat4(1.0f), glm::vec3(cubeLocX, cubeLocY, cubeLocZ));
 
-	//mMat = tMat * rMat;
-
-	//mvMat = vMat * mMat;
+    mvMat = vMat * mMat;
 	
-	tfLoc = glGetUniformLocation(renderingProgram, "tf");
-
-	glUniform1f(tfLoc, (float)currentTime);
-
 	// 将透视矩阵和mv矩阵复制给相应的统一变量
-	glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
-	glUniformMatrix4fv(vLoc, 1, GL_FALSE, glm::value_ptr(vMat));
+	glUniformMatrix4fv(mvLoc, 1, GL_FALSE, glm::value_ptr(mvMat));
 	glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(pMat));
 
 	// 将VBO关联给顶点着色器中相应的顶点属性
@@ -143,46 +109,29 @@ void display(GLFWwindow *window, double currentTime) {
 	// 调整OpenGL设置，绘制模型
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LEQUAL);
-	//glDrawArrays(GL_TRIANGLES, 0, 36);
-	glDrawArraysInstanced(GL_TRIANGLES, 0, 36, 100000);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+
+	// draw the pyramid using buffer #1
+	mMat = glm::translate(glm::mat4(1.0f), glm::vec3(pyrLocX, pyrLocY, pyrLocZ));
+	mvMat = vMat * mMat;
+
+	glUniformMatrix4fv(mvLoc, 1, GL_FALSE, glm::value_ptr(mvMat));
+	glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(pMat));
+
+	glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(0);
+
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LEQUAL);
+
+	glDrawArrays(GL_TRIANGLES, 0, 18);
 }
 
-void printShaderLog(GLuint shader) {
-	int len = 0;
-	int chWritten = 0;
-	char *log;
-	glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &len);
-	
-	if (len > 0) {
-		log = (char *)malloc(len);
-		glGetShaderInfoLog(shader, len, &chWritten, log);
-		cout << "Shader Info Log: " << log << endl;
-		free(log);
-	}
-}
-
-void printProgramLog(int prog) {
-	int len = 0;
-	int chWritten = 0;
-	char *log;
-	glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &len);
-	if (len > 0) {
-		log = (char *)malloc(len);
-		glGetProgramInfoLog(prog, len, &chWritten, log);
-		cout << "Program Info Log: " << log << endl;
-		free(log);
-	}
-}
-
-bool checkOpenGLError() {
-	bool foundError = false;
-	int glErr = glGetError();
-	while (glErr != GL_NO_ERROR) { // 注意这里用的WHILE
-		cout << "glError: " << glErr << endl;
-		foundError = true;
-		glErr = glGetError(); 
-	}
-	return foundError;
+void window_size_callback(GLFWwindow* win, int newWidth, int newHeight) {
+	aspect = (float)newWidth / (float)newHeight;
+	glViewport(0, 0, newWidth, newHeight);
+	pMat = glm::perspective(1.0472f, aspect, 0.1f, 1000.0f);
 }
 
 int main(void) {
@@ -198,6 +147,9 @@ int main(void) {
 		exit(EXIT_FAILURE);
 	}
 	glfwSwapInterval(1);
+
+	glfwSetWindowSizeCallback(window, window_size_callback);
+
 	init(window);
 
 	while (!glfwWindowShouldClose(window))
