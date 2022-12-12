@@ -25,7 +25,7 @@ GLuint renderingProgram;
 GLuint vao[numVAOs];
 GLuint vbo[numVBOs];
 
-GLuint mvLoc, projLoc;
+GLuint mLoc, vLoc, mvLoc, projLoc, tfLoc;
 int width, height;
 float aspect;
 glm::mat4 pMat, vMat, mMat, mvMat, tMat, rMat;
@@ -92,7 +92,7 @@ GLuint createShaderProgram() {
 
 void init(GLFWwindow *window) {
 	renderingProgram = Utils::createShaderProgram("shader/vShader.glsl", "shader/fShader.glsl");
-	cameraX = 0.0f; cameraY = 0.0f; cameraZ = 8.0f;
+	cameraX = 0.0f; cameraY = 0.0f; cameraZ = 428.0f;
 	cubeLocX = 0.0f; cubeLocY = -2.0f; cubeLocZ = 0.0f;
 	setupVertices();
 }
@@ -102,7 +102,8 @@ void display(GLFWwindow *window, double currentTime) {
 	glUseProgram(renderingProgram);
 
 	// 获取MV矩阵和投影矩阵的统一变量
-	mvLoc = glGetUniformLocation(renderingProgram, "mv_matrix");
+	mLoc = glGetUniformLocation(renderingProgram, "m_matrix");
+	vLoc = glGetUniformLocation(renderingProgram, "v_matrix");
 	projLoc = glGetUniformLocation(renderingProgram, "proj_matrix");
 
 	// 构建透视矩阵
@@ -112,19 +113,25 @@ void display(GLFWwindow *window, double currentTime) {
 
 	// 构建视图矩阵、模型矩阵和视图-模型矩阵
 	vMat = glm::translate(glm::mat4(1.0f), glm::vec3(-cameraX, -cameraY, -cameraZ));
+	mMat = glm::mat4(1.0f);
 
-	tMat = glm::translate(glm::mat4(1.0f), glm::vec3(sin(0.35f*currentTime)*2.0f, cos(0.52f*currentTime)*2.0f, sin(0.7f*currentTime)*2.0f));
+	//tMat = glm::translate(glm::mat4(1.0f), glm::vec3(sin(0.35f*currentTime)*2.0f, cos(0.52f*currentTime)*2.0f, sin(0.7f*currentTime)*2.0f));
 	
-	rMat = glm::rotate(glm::mat4(1.0f), 1.75f*(float)currentTime, glm::vec3(0.0f, 1.0f, 0.0f));
-	rMat = glm::rotate(rMat, 1.75f*(float)currentTime, glm::vec3(1.0f, 0.0f, 0.0f));
-	rMat = glm::rotate(rMat, 1.75f*(float)currentTime, glm::vec3(0.0f, 0.0f, 1.0f));
+	//rMat = glm::rotate(glm::mat4(1.0f), 1.75f*(float)currentTime, glm::vec3(0.0f, 1.0f, 0.0f));
+	//rMat = glm::rotate(rMat, 1.75f*(float)currentTime, glm::vec3(1.0f, 0.0f, 0.0f));
+	//rMat = glm::rotate(rMat, 1.75f*(float)currentTime, glm::vec3(0.0f, 0.0f, 1.0f));
 
-	mMat = tMat * rMat;
+	//mMat = tMat * rMat;
 
-	mvMat = vMat * mMat;
+	//mvMat = vMat * mMat;
+	
+	tfLoc = glGetUniformLocation(renderingProgram, "tf");
+
+	glUniform1f(tfLoc, (float)currentTime);
 
 	// 将透视矩阵和mv矩阵复制给相应的统一变量
-	glUniformMatrix4fv(mvLoc, 1, GL_FALSE, glm::value_ptr(mvMat));
+	glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
+	glUniformMatrix4fv(vLoc, 1, GL_FALSE, glm::value_ptr(vMat));
 	glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(pMat));
 
 	// 将VBO关联给顶点着色器中相应的顶点属性
@@ -136,7 +143,8 @@ void display(GLFWwindow *window, double currentTime) {
 	// 调整OpenGL设置，绘制模型
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LEQUAL);
-	glDrawArrays(GL_TRIANGLES, 0, 36);
+	//glDrawArrays(GL_TRIANGLES, 0, 36);
+	glDrawArraysInstanced(GL_TRIANGLES, 0, 36, 100000);
 }
 
 void printShaderLog(GLuint shader) {
