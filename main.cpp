@@ -16,7 +16,7 @@
 using namespace std;
 
 #define numVAOs 1
-#define numVBOs 2
+#define numVBOs 3
 
 float cameraX, cameraY, cameraZ;
 float cubeLocX, cubeLocY, cubeLocZ;
@@ -25,8 +25,9 @@ float pyrLocX, pyrLocY, pyrLocZ;
 GLuint renderingProgram;
 GLuint vao[numVAOs];
 GLuint vbo[numVBOs];
+GLuint brickTextureID;
 
-GLuint mvLoc, projLoc, tfLoc;
+GLuint mvLoc, projLoc, tfLoc, tcLoc;
 int width, height;
 float aspect;
 glm::mat4 pMat, vMat, mMat, mvMat;
@@ -55,6 +56,11 @@ void setupVertices() {
 		-1.0f, -1.0f, -1.0f, 1.0f, -1.0f, 1.0f, -1.0f, -1.0f, 1.0f, //LF
 		1.0f, -1.0f, 1.0f, -1.0f, -1.0f, -1.0f, 1.0f, -1.0f, -1.0f  //RR
 	};
+	float pyrTexCoords[36] =
+	{ 0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f,   0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f,   // 前侧面、右侧面
+	  0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f,   0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f,   // 后侧面、左侧面
+	  0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f,   1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f }; // 底面的两个三角形
+
 	glGenVertexArrays(1, vao);
 	glBindVertexArray(vao[0]);
 	glGenBuffers(numVBOs, vbo);
@@ -63,10 +69,14 @@ void setupVertices() {
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertexPositions), vertexPositions, GL_STATIC_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(pyramidPositions), pyramidPositions, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo[2]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(pyrTexCoords), pyrTexCoords, GL_STATIC_DRAW);
 }
 
 void init(GLFWwindow *window) {
 	renderingProgram = Utils::createShaderProgram("shader/vShader.glsl", "shader/fShader.glsl");
+
+	brickTextureID = Utils::loadTexture("textures/brick1.jpg");
 
 	// 构建透视矩
 	glfwGetFramebufferSize(window, &width, &height);
@@ -82,6 +92,9 @@ void init(GLFWwindow *window) {
 void display(GLFWwindow *window, double currentTime) {
 	glClear(GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT);
 	glUseProgram(renderingProgram);
+
+	glActiveTexture(GL_TEXTURE0); // 激活第0个纹理单元
+	glBindTexture(GL_TEXTURE_2D, brickTextureID);
 
 	// 获取MV矩阵和投影矩阵的统一变量
 	mvLoc = glGetUniformLocation(renderingProgram, "mv_matrix");
@@ -121,6 +134,9 @@ void display(GLFWwindow *window, double currentTime) {
 	glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo[2]);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(1);
 
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LEQUAL);
